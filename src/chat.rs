@@ -96,7 +96,7 @@ where
 
         loop {
             // Output the prompt character
-            self.user_start(&mut output).await?;
+            Self::user_start(&mut output).await?;
 
             let mut input_buf = String::new();
             input.read_line(&mut input_buf).await?;
@@ -118,7 +118,7 @@ where
                 .multi_turn(self.multi_turn_depth)
                 .await;
 
-            self.output_start(&mut output).await?;
+            Self::output_start(&mut output).await?;
 
             while let Some(chunk) = stream_response.next().await {
                 match chunk {
@@ -126,7 +126,7 @@ where
                         text,
                     }))) => {
                         response.push_str(&text);
-                        self.output_text(text, &mut output).await?;
+                        Self::output_text(text, &mut output).await?;
                     }
                     Ok(MultiTurnStreamItem::FinalResponse(r)) => {
                         if self.show_usage {
@@ -134,7 +134,7 @@ where
                         }
                     }
                     Err(e) => {
-                        self.output_error(e, &mut output).await?;
+                        Self::output_error(e, &mut output).await?;
                     }
                     _ => {}
                 }
@@ -143,7 +143,7 @@ where
             chat_log.push(Message::user(input));
             chat_log.push(Message::assistant(response.clone()));
 
-            self.output_finished(usage, &mut output).await?;
+            Self::output_finished(usage, &mut output).await?;
 
             tracing::info!("Response: \n{}\n", response);
         }
@@ -151,7 +151,7 @@ where
         Ok(())
     }
 
-    async fn user_start(&self, output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
+    async fn user_start(output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
         output
             .write_all(b"\n\x1b[1;32m\xF0\x9F\x98\x80 User: \x1b[0m\n> ")
             .await?;
@@ -160,7 +160,7 @@ where
         Ok(())
     }
 
-    async fn output_start(&self, output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
+    async fn output_start(output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
         output
             .write_all(b"\n\x1b[1;34m\xF0\x9F\xA4\x96 Agent: \x1b[0m\n")
             .await?;
@@ -170,7 +170,6 @@ where
     }
 
     async fn output_text(
-        &self,
         content: impl std::fmt::Display,
         output: &mut BufWriter<tokio::io::Stdout>,
     ) -> std::io::Result<()> {
@@ -181,7 +180,6 @@ where
     }
 
     async fn output_finished(
-        &self,
         usage: Option<Usage>,
         output: &mut BufWriter<tokio::io::Stdout>,
     ) -> std::io::Result<()> {
@@ -203,7 +201,6 @@ where
     }
 
     async fn output_error(
-        &self,
         e: impl std::fmt::Display,
         output: &mut BufWriter<tokio::io::Stdout>,
     ) -> std::io::Result<()> {

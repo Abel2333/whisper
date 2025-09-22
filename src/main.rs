@@ -1,5 +1,6 @@
 pub mod chat;
 pub mod mcp_adaptor;
+pub mod config;
 
 use std::env;
 
@@ -29,13 +30,13 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     let _client = match deepseek::Client::builder(
-        env::var("MODEL_API_KEY")
-            .expect("`MODEL_API_KEY` not set")
+        env::var("PROVIDER_API_KEY")
+            .expect("`PROVIDER_API_KEY` not set")
             .as_str(),
     )
     .base_url(
-        env::var("MODEL_BASE_URL")
-            .expect("`MODEL_BASE_URL` not set")
+        env::var("PROVIDER_BASE_URL")
+            .expect("`PROVIDER_BASE_URL` not set")
             .as_str(),
     )
     .build()
@@ -51,7 +52,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let agent = _client
-        .agent("qwen/qwen3-coder-30b")
+        .agent(env::var("MODEL_NAME").expect("`MODEL_NAME` not set").as_str())
         .preamble("Be precise and concise.")
         .temperature(0.5)
         .build();

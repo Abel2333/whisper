@@ -8,8 +8,23 @@ anyhow = "1.0.99"
 dotenvy = "0.15.7"
 futures = "0.3.31"
 rig-core = { version = "0.20.0", features = ["rmcp"] }
-rmcp = "0.6.4"
+rmcp = { version = "0.6.4", features = [
+  "client",
+  "transport-child-process",
+  "transport-sse-client",
+  "transport-sse-client-reqwest",
+  "transport-streamable-http-client",
+  "transport-streamable-http-client-reqwest",
+] }
+serde = { version = "1.0.226", features = ["derive"] }
+serde_json = "1.0.145"
+serde_toml = "0.0.1"
 tokio = { version = "1.47.1", features = ["full"] }
+toml = "0.9.7"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.20", features = ["env-filter", "std", "fmt"] }
+tracing-subscriber = { version = "0.3.20", features = [
+  "env-filter",
+  "fmt",
+  "std",
+] }
