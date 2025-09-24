@@ -1,10 +1,9 @@
 pub mod chat;
 pub mod mcp_adaptor;
-pub mod config;
 
 use std::env;
 
-use rig::{client::CompletionClient, providers::deepseek};
+use rig::{agent::AgentBuilder, client::CompletionClient, providers::openai};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 
 use crate::chat::SessionBuilder;
@@ -29,17 +28,9 @@ async fn main() -> Result<(), anyhow::Error> {
         .with_ansi(false)
         .init();
 
-    let _client = match deepseek::Client::builder(
-        env::var("PROVIDER_API_KEY")
-            .expect("`PROVIDER_API_KEY` not set")
-            .as_str(),
-    )
-    .base_url(
-        env::var("PROVIDER_BASE_URL")
-            .expect("`PROVIDER_BASE_URL` not set")
-            .as_str(),
-    )
-    .build()
+    let client = match openai::Client::builder(env::var("PROVIDER_API_KEY")?.as_str())
+        .base_url(env::var("PROVIDER_BASE_URL")?.as_str())
+        .build()
     {
         Ok(c) => {
             tracing::info!("Client initialized successfully");
@@ -51,13 +42,25 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     };
 
-    let agent = _client
-        .agent(env::var("MODEL_NAME").expect("`MODEL_NAME` not set").as_str())
-        .preamble("Be precise and concise.")
-        .temperature(0.5)
+    let chat_model = client
+        .completion_model(env::var("MODEL_NAME")?.as_str())
+        .completions_api();
+
+    let agent = AgentBuilder::new(chat_model)
+        .preamble(
+            "You are a helpful assistant.
+When answering questions, first write out your reasoning step by step,
+then give the final concise answer.  Keep the explanation short but clear.
+",
+        )
+        .temperature(0.6)
         .build();
 
-    let conversation = SessionBuilder::new().agent(agent).show_usage().build();
+    let conversation = SessionBuilder::new()
+        .agent(agent)
+        .multi_turn_depth(4)
+        .show_usage()
+        .build();
 
     conversation.run().await
 }

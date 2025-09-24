@@ -3,6 +3,7 @@ use rig::{
     agent::{Agent, MultiTurnStreamItem, Text},
     cli_chatbot::AgentNotSet,
     completion::{CompletionModel, Message, Usage},
+    message::Reasoning,
     streaming::{StreamedAssistantContent, StreamingPrompt},
 };
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
@@ -125,8 +126,22 @@ where
                     Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(Text {
                         text,
                     }))) => {
+                        if text.contains("<think>") {
+                            Self::output_reason_start(&mut output).await?;
+                            continue;
+                        }
+                        if text.contains("</think>") {
+                            Self::output_reason_end(&mut output).await?;
+                            continue;
+                        }
                         response.push_str(&text);
                         Self::output_text(text, &mut output).await?;
+                    }
+                    Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Reasoning(
+                        Reasoning { reasoning, .. },
+                    ))) => {
+                        let reasoning = reasoning.join("\n");
+                        Self::output_text(reasoning, &mut output).await?;
                     }
                     Ok(MultiTurnStreamItem::FinalResponse(r)) => {
                         if self.show_usage {
@@ -176,6 +191,24 @@ where
         output.write_all(content.to_string().as_bytes()).await?;
         output.flush().await?;
 
+        Ok(())
+    }
+
+    async fn output_reason_start(output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
+        output
+            .write_all("\n\x1b[1;90m🧠 Reasoning\n───────────────\n".as_bytes())
+            .await?;
+
+        output.flush().await?;
+        Ok(())
+    }
+
+    async fn output_reason_end(output: &mut BufWriter<tokio::io::Stdout>) -> std::io::Result<()> {
+        output
+            .write_all("\n────────────────\x1b[0m".as_bytes())
+            .await?;
+
+        output.flush().await?;
         Ok(())
     }
 
