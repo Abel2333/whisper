@@ -1,11 +1,10 @@
-use std::collections::HashMap;
+use std::vec;
 
 use rig::tool::{ToolDyn as RigTool, ToolEmbeddingDyn, ToolSet};
 use rmcp::{
-    RoleClient,
     model::{CallToolRequestParam, CallToolResult, Tool as McpTool},
     serde_json,
-    service::{RunningService, ServerSink},
+    service::ServerSink,
 };
 
 pub struct McpToolAdaptor {
@@ -71,36 +70,6 @@ impl ToolEmbeddingDyn for McpToolAdaptor {
                 .unwrap_or_default()
                 .to_string(),
         ]
-    }
-}
-
-pub struct McpManager {
-    pub clients: HashMap<String, RunningService<RoleClient, ()>>,
-}
-
-impl McpManager {
-    pub async fn get_tool_set(&self) -> anyhow::Result<ToolSet> {
-        let mut tool_set = ToolSet::default();
-        let mut task = tokio::task::JoinSet::<anyhow::Result<_>>::new();
-
-        for client in self.clients.values() {
-            let server = client.peer().clone();
-            task.spawn(get_tool_set(server));
-        }
-
-        let results = task.join_all().await;
-        for result in results {
-            match result {
-                Err(e) => {
-                    tracing::error!(error=%e, "Failed to get tool set");
-                }
-                Ok(tools) => {
-                    tool_set.add_tools(tools);
-                }
-            }
-        }
-
-        Ok(tool_set)
     }
 }
 

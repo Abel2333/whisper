@@ -1,5 +1,5 @@
 pub mod chat;
-pub mod mcp_adaptor;
+pub mod mcp;
 
 use std::env;
 
