@@ -1,12 +1,19 @@
 pub mod chat;
 pub mod mcp;
+pub mod config;
 
 use std::env;
 
-use rig::{agent::AgentBuilder, client::CompletionClient, providers::openai};
+use rig::{
+    agent::AgentBuilder,
+    client::{CompletionClient, EmbeddingsClient},
+    embeddings::EmbeddingsBuilder,
+    providers::openai,
+    vector_store::in_memory_store::InMemoryVectorStore,
+};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 
-use crate::chat::SessionBuilder;
+use crate::{chat::SessionBuilder, mcp::manager::McpManagerBuilder};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -28,6 +35,13 @@ async fn main() -> Result<(), anyhow::Error> {
         .with_ansi(false)
         .init();
 
+    let mcp_manager = McpManagerBuilder::new()
+        .add_sse("Weather", "http://localhost:8000/sse")
+        .build()
+        .await?;
+
+    let tool_set = mcp_manager.get_tool_set().await?;
+
     let client = match openai::Client::builder(env::var("PROVIDER_API_KEY")?.as_str())
         .base_url(env::var("PROVIDER_BASE_URL")?.as_str())
         .build()
@@ -46,6 +60,16 @@ async fn main() -> Result<(), anyhow::Error> {
         .completion_model(env::var("MODEL_NAME")?.as_str())
         .completions_api();
 
+    let embed_model = client.embedding_model("text-embedding-v3");
+    let embeddings = EmbeddingsBuilder::new(embed_model.clone())
+        .documents(tool_set.schemas()?)?
+        .build()
+        .await?;
+
+    let store = InMemoryVectorStore::from_documents_with_id_f(embeddings, |tool| tool.name.clone());
+
+    let index = store.index(embed_model);
+
     let agent = AgentBuilder::new(chat_model)
         .preamble(
             "You are a helpful assistant.
@@ -54,6 +78,7 @@ then give the final concise answer.  Keep the explanation short but clear.
 ",
         )
         .temperature(0.6)
+        .dynamic_tools(2, index, tool_set)
         .build();
 
     let conversation = SessionBuilder::new()

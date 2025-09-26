@@ -3,7 +3,7 @@ use rig::{
     agent::{Agent, MultiTurnStreamItem, Text},
     cli_chatbot::AgentNotSet,
     completion::{CompletionModel, Message, Usage},
-    message::Reasoning,
+    message::{Reasoning, ToolCall},
     streaming::{StreamedAssistantContent, StreamingPrompt},
 };
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
@@ -121,6 +121,8 @@ where
 
             Self::output_start(&mut output).await?;
 
+            let mut is_reasoning = false;
+
             while let Some(chunk) = stream_response.next().await {
                 match chunk {
                     Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(Text {
@@ -128,20 +130,41 @@ where
                     }))) => {
                         if text.contains("<think>") {
                             Self::output_reason_start(&mut output).await?;
+                            is_reasoning = true;
+
                             continue;
                         }
                         if text.contains("</think>") {
                             Self::output_reason_end(&mut output).await?;
+                            is_reasoning = false;
+
                             continue;
                         }
-                        response.push_str(&text);
+
+                        if !is_reasoning {
+                            response.push_str(&text);
+                        }
                         Self::output_text(text, &mut output).await?;
                     }
                     Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Reasoning(
                         Reasoning { reasoning, .. },
                     ))) => {
                         let reasoning = reasoning.join("\n");
+
+                        Self::output_reason_start(&mut output).await?;
                         Self::output_text(reasoning, &mut output).await?;
+                        Self::output_reason_end(&mut output).await?;
+                    }
+                    Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::ToolCall(
+                        ToolCall { function, .. },
+                    ))) => {
+                        let call_msg = format!(
+                            "Call function {} with arguments {}...",
+                            function.name, function.arguments
+                        );
+
+                        response.push_str(&call_msg);
+                        Self::output_text(call_msg, &mut output).await?;
                     }
                     Ok(MultiTurnStreamItem::FinalResponse(r)) => {
                         if self.show_usage {
@@ -221,7 +244,7 @@ where
         if let Some(usage) = usage {
             let usage_text = format!(
                 "\n\x1b[1;33m📊 Token Usage\x1b[0m\n\
-                 \x1b[1;30m───────────────\x1b[0m\n\
+                 \x1b[1;30m────────────────\x1b[0m\n\
                  🔹 Input Tokens : {}\n\
                  🔹 Output Tokens: {}\n",
                 usage.input_tokens, usage.output_tokens

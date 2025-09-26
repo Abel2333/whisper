@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::tool_adaptor;
-use super::transport::TransportConfig;
+use super::transport::{TransportConfig, start as start_transport};
 use rig::tool::ToolSet;
 use rmcp::{RoleClient, service::RunningService};
 
@@ -90,10 +90,10 @@ impl McpManagerBuilder {
         let mut task_set = tokio::task::JoinSet::<anyhow::Result<_>>::new();
 
         for server in &self.server {
-            let server = server.clone();
+            let (server_name, transport_config) = server.clone();
             task_set.spawn(async move {
-                let client = server.1.start().await?;
-                anyhow::Result::Ok((server.0.clone(), client))
+                let client = start_transport(transport_config).await?;
+                anyhow::Result::Ok((server_name.clone(), client))
             });
         }
 
