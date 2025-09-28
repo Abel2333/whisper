@@ -1,1 +1,27 @@
-provider_base_url=""
+# config.toml
+
+[[models]]
+base_url = "https://api.toml.com"
+api_key = "toml-key"
+model_name = "gpt-4"
+model_type = "chat"
+
+[[models]]
+base_url = "https://api.toml2.com"
+api_key = "toml-key-2"
+model_name = "text-embedding-ada-002"
+model_type = "embedding"
+
+[[mcp_servers]]
+protocol = "sse"
+url = "http://sse.example.com/sse"
+
+[[mcp_servers]]
+protocol = "streamable"
+url = "http://streamable.example.com/mcp"
+
+[[mcp_servers]]
+protocol = "stdio"
+command = "python3"
+args = ["script.py", "--verbose"]
+envs = { DEBUG = "true", API_KEY = "xyz" }

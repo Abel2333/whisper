@@ -1,8 +1,10 @@
 use std::{collections::HashMap, process::Stdio};
 
 use rmcp::{RoleClient, ServiceExt, service::RunningService, transport::ConfigureCommandExt};
+use serde::{self, Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "protocol", rename_all = "lowercase")]
 pub enum TransportConfig {
     Sse {
         url: String,

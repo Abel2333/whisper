@@ -1,6 +1,6 @@
 pub mod chat;
-pub mod mcp;
 pub mod config;
+pub mod mcp;
 
 use std::env;
 
@@ -19,6 +19,11 @@ use crate::{chat::SessionBuilder, mcp::manager::McpManagerBuilder};
 async fn main() -> Result<(), anyhow::Error> {
     // Load environment file
     dotenvy::dotenv().ok();
+
+    println!("Read config...");
+    let app_config = config::read_config::load_config()?;
+    println!("Get {app_config:#?}");
+
 
     let file_appender = RollingFileAppender::new(
         Rotation::DAILY,
