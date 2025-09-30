@@ -8,7 +8,7 @@ model_type = "chat"
 
 [[models]]
 base_url = "https://api.toml2.com"
-api_key = "toml-key-2"
+api_key = "BUMaHBgPyGR5qzOIKD55ZkGZZ+FLD3JM2o1KksHfIBuwvqqJHWAUvVXiw4gyzH7/jwRiN5Bs7prkjEHyH/z1iQGSLwEfohj8sSzxJVAREg=="
 model_name = "text-embedding-ada-002"
 model_type = "embedding"
 
