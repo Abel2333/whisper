@@ -15,10 +15,12 @@ model_type = "embedding"
 
 
 [[mcp_servers]]
+name = "SseExample"
 protocol = "sse"
 url = "http://sse.example.com/sse"
 
 [[mcp_servers]]
+name = "StreamableExample"
 protocol = "streamable"
 url = "http://streamable.example.com/mcp"
 

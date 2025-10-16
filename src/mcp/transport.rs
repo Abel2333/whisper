@@ -7,12 +7,15 @@ use serde::{self, Deserialize, Serialize};
 #[serde(tag = "protocol", rename_all = "lowercase")]
 pub enum TransportConfig {
     Sse {
+        name: String,
         url: String,
     },
     Streamable {
+        name: String,
         url: String,
     },
     Stdio {
+        name: String,
         command: String,
         args: Vec<String>,
         envs: HashMap<String, String>,
@@ -21,18 +24,19 @@ pub enum TransportConfig {
 
 pub async fn start(config: TransportConfig) -> anyhow::Result<RunningService<RoleClient, ()>> {
     let client = match config {
-        TransportConfig::Streamable { url } => {
+        TransportConfig::Streamable { name: _, url } => {
             let transport =
                 rmcp::transport::StreamableHttpClientTransport::from_uri(url.to_string());
 
             ().serve(transport).await?
         }
-        TransportConfig::Sse { url } => {
+        TransportConfig::Sse { name: _, url } => {
             let transport = rmcp::transport::SseClientTransport::start(url.to_string()).await?;
 
             ().serve(transport).await?
         }
         TransportConfig::Stdio {
+            name: _,
             command,
             args,
             envs,

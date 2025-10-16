@@ -1,7 +1,6 @@
 // pub mod chat;
 // pub mod config;
 // pub mod mcp;
-use whisper::chat;
 use whisper::config;
 use whisper::mcp;
 

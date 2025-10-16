@@ -1,8 +1,8 @@
 use crate::mcp::transport::TransportConfig;
+use crate::secure::{self, load_key_from_env};
 use config::{Config, Environment, File};
 use dotenvy::dotenv;
 use serde::{Deserialize, Deserializer, Serialize};
-use crate::secure::{self, load_key_from_env};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
@@ -20,7 +20,7 @@ pub struct ModelConfig {
     pub model_type: ModelType,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ModelType {
     Embedding,

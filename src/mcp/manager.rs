@@ -43,7 +43,7 @@ pub struct McpManagerBuilder {
 
 impl Default for McpManagerBuilder {
     fn default() -> Self {
-        Self::new().add_sse("default-mcp", "http://localhost:8080/mcp")
+        Self::new()
     }
 }
 
@@ -52,35 +52,63 @@ impl McpManagerBuilder {
         Self { server: Vec::new() }
     }
 
-    pub fn add_sse(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
-        self.server
-            .push((name.into(), TransportConfig::Sse { url: url.into() }));
+    pub fn add_sse(mut self, name: String, url: impl Into<String>) -> Self {
+        self.server.push((
+            name.clone(),
+            TransportConfig::Sse {
+                name,
+                url: url.into(),
+            },
+        ));
 
         self
     }
 
-    pub fn add_streamable(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
-        self.server
-            .push((name.into(), TransportConfig::Streamable { url: url.into() }));
+    pub fn add_streamable(mut self, name: String, url: impl Into<String>) -> Self {
+        self.server.push((
+            name.clone(),
+            TransportConfig::Streamable {
+                name,
+                url: url.into(),
+            },
+        ));
 
         self
     }
 
     pub fn add_stdio(
         mut self,
-        name: impl Into<String>,
+        name: String,
         command: impl Into<String>,
         args: Vec<String>,
         envs: HashMap<String, String>,
     ) -> Self {
         self.server.push((
-            name.into(),
+            name.clone(),
             TransportConfig::Stdio {
+                name,
                 command: command.into(),
                 args,
                 envs,
             },
         ));
+
+        self
+    }
+
+    pub fn load_config(mut self, mcp_config: &Vec<TransportConfig>)->Self {
+        for item in mcp_config {
+            self = match item {
+                TransportConfig::Sse { name, url } => self.add_sse(name.clone(), url),
+                TransportConfig::Streamable { name, url } => self.add_streamable(name.clone(), url),
+                TransportConfig::Stdio {
+                    name,
+                    command,
+                    args,
+                    envs,
+                } => self.add_stdio(name.clone(), command, args.clone(), envs.clone()),
+            };
+        }
 
         self
     }
