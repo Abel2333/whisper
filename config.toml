@@ -1,16 +1,18 @@
 # config.toml
-
 [[models]]
-base_url = "https://api.toml.com"
-api_key = "toml-key"
-model_name = "gpt-4"
+base_url = "https://api.deepseek.com/v1"
+api_key = "iKJJLQk6z0bhHgDcw/7enkVRedPwlmdWgeZl+0u2+FuybRYvNyS2lzcDI+1uZOI+hj+2oFoQJ1LCEpAPFlMT"
+provider = "DeepSeek"
+model_name = "text-embedding-ada-002"
 model_type = "chat"
 
 [[models]]
-base_url = "https://api.toml2.com"
-api_key = "BUMaHBgPyGR5qzOIKD55ZkGZZ+FLD3JM2o1KksHfIBuwvqqJHWAUvVXiw4gyzH7/jwRiN5Bs7prkjEHyH/z1iQGSLwEfohj8sSzxJVAREg=="
-model_name = "text-embedding-ada-002"
+base_url = "http://localhost:11434"
+provider = "ollama"
+api_key = "IMvqT8etkXCtqVZNuzleUNbqdEKo5rsEdKnYHjyd2AcrGb+unX0D6gzdYRq7xuybYPY7iQf0OUuhFLa5kzFYpvrHh1jYbXll7vkLEwh2M2wW5sjjP33W7dl+eZ9Qn16I"
+model_name = "gpt-4"
 model_type = "embedding"
+
 
 [[mcp_servers]]
 protocol = "sse"

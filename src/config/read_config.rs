@@ -1,8 +1,8 @@
 use crate::mcp::transport::TransportConfig;
 use config::{Config, Environment, File};
 use dotenvy::dotenv;
-use serde::{Deserialize, Serialize};
-use whisper::secure::{self, load_key_from_env};
+use serde::{Deserialize, Deserializer, Serialize};
+use crate::secure::{self, load_key_from_env};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
@@ -14,6 +14,8 @@ pub struct AppConfig {
 pub struct ModelConfig {
     pub base_url: String,
     pub api_key: String,
+    #[serde(deserialize_with = "to_lowercase")]
+    pub provider: String,
     pub model_name: String,
     pub model_type: ModelType,
 }
@@ -24,6 +26,14 @@ pub enum ModelType {
     Embedding,
     Completion,
     Chat,
+}
+
+fn to_lowercase<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(s.to_lowercase())
 }
 
 pub fn load_config() -> Result<AppConfig, config::ConfigError> {
@@ -40,11 +50,13 @@ pub fn load_config() -> Result<AppConfig, config::ConfigError> {
     let mut valid_models = Vec::new();
 
     for mut model in config.models {
+        // Decrypt api_key
         match secure::aes::decrypt(&model.api_key, &key_bytes) {
             Ok(decrypted) => {
                 model.api_key = decrypted;
                 valid_models.push(model);
             }
+            // if decrypt error, skip this model
             Err(e) => {
                 eprintln!(
                     "Failed to decrypt api_key for model '{}': {}. Skip it.",

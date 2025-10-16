@@ -2,7 +2,7 @@ pub mod aes;
 use anyhow::anyhow;
 use base64::{Engine, engine::general_purpose};
 use rand::TryRngCore;
-use std::{env, fs, io::Write};
+use std::{env, io::Write};
 
 pub fn load_key_from_env(var: &str) -> anyhow::Result<[u8; 32]> {
     dotenvy::dotenv().ok();
@@ -11,24 +11,27 @@ pub fn load_key_from_env(var: &str) -> anyhow::Result<[u8; 32]> {
         Ok(val) => val,
         // if not exist, create a new one and write into `.env` file
         Err(_) => {
-            let mut key = [0u8; 32];
-            rand::rngs::OsRng
-                .try_fill_bytes(&mut key)
-                .map_err(|e| anyhow!("Failed to generate key: {}", e))?;
-            let encoded = general_purpose::STANDARD.encode(key);
-            let newline = if cfg!(windows) { "\r\n" } else { "\n" };
-            let line = format!("{}=B64:{}{}", var, encoded, newline);
+            print!("Missing environment variable '{var}'. Generate a new AES-256 key now? [Y/n]:");
+            std::io::stdout().flush()?;
 
-            let mut file = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(".env")
-                .map_err(|e| anyhow!("Failed to open .env: {}", e))?;
-            file.write_all(line.as_bytes())
-                .map_err(|e| anyhow!("Failed to write to .env: {}", e))?;
+            let mut answer = String::new();
+            std::io::stdin().read_line(&mut answer)?;
+            answer = answer.trim().to_lowercase();
 
-            println!("Generated and saved new key to .env");
-            return Ok(key);
+            if answer == "y" {
+                let mut key = [0u8; 32];
+                rand::rngs::OsRng
+                    .try_fill_bytes(&mut key)
+                    .map_err(|e| anyhow!("Failed to generate key: {}", e))?;
+                let encoded = general_purpose::STANDARD.encode(key);
+
+                println!("\nYour encryption key has been generated: `B64:{encoded}'");
+                println!("Please store it securely\n");
+
+                return Ok(key);
+            } else {
+                return Err(anyhow!("User declined to generate key"));
+            }
         }
     };
 

@@ -31,9 +31,17 @@ fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     let cli = Cli::parse();
-    let key_bytes = load_key_from_env("ENCRYPT_KEY").expect("Get key bytes error!");
+    // Read key_bytes from envronment
+    let key_bytes = match load_key_from_env("ENCRYPT_KEY") {
+        Ok(key) => key,
+        Err(e) => {
+            eprintln!("Error - {e}");
+            std::process::exit(1);
+        }
+    };
 
     match cli.command {
+        // Read key
         Commands::Encrypt { text } => {
             let crypt_text = secure::aes::encrypt(&text, &key_bytes)?;
             println!("Encrypted text: {crypt_text}");
