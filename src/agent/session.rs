@@ -1,12 +1,13 @@
-use futures::StreamExt;
+use futures::{Future, StreamExt};
+use log::{debug, info};
 use rig::{
     agent::{Agent, MultiTurnStreamItem, Text},
     completion::{Chat, CompletionModel, Message, Usage},
     message::{Reasoning, ToolCall},
     streaming::{StreamedAssistantContent, StreamingPrompt},
 };
+use std::{io, pin::Pin};
 
-use std::io;
 use thiserror::Error;
 
 /// Unified error type for ResponseSink
@@ -44,66 +45,68 @@ where
     usage: Usage,
 }
 
+/// Type-state builder that ensures an agent/chat implementation is provided.
 pub struct SessionBuilder<T>(T);
 
+/// Wrapper that executes the configured chat or agent.
 pub struct Session<T>(T);
 
 /// Trait to abstract display
 pub trait ResponseSink {
     /// Output the string to indicate the start of the chat
-    async fn chat_start(&mut self) -> Result<(), SinkError>;
+    fn chat_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
     /// Output the string to indicate the start of user's query
-    async fn user_start(&mut self) -> Result<(), SinkError>;
+    fn user_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
     /// Output the string to indicate the start of assistant's answer
-    async fn output_start(&mut self) -> Result<(), SinkError>;
+    fn output_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
     /// Output the normal text
-    async fn output_text(
+    fn output_text(
         &mut self,
         content: &(dyn std::fmt::Display + Send + Sync),
-    ) -> Result<(), SinkError>;
+    ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
     /// Output the start of reasoning content
-    async fn output_reason_start(&mut self) -> Result<(), SinkError>;
+    fn output_reason_start(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
     /// Output the end of reasoning content
-    async fn output_reason_end(&mut self) -> Result<(), SinkError>;
+    fn output_reason_end(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
     /// Output the end of assistant's answer
-    async fn output_finished(&mut self, usage: &Option<Usage>) -> Result<(), SinkError>;
+    fn output_finished(
+        &mut self,
+        usage: &Option<Usage>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
     /// Output the end of chat
-    async fn chat_finished(&mut self) -> Result<(), SinkError>;
+    fn chat_finished(&mut self)
+    -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
     /// Output the error
-    async fn output_error(
+    fn output_error(
         &mut self,
         e: &(dyn std::fmt::Display + Send + Sync),
-    ) -> Result<(), SinkError>;
+    ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 }
 
 /// Trait to abstract get input
 pub trait InputSource {
-    async fn read_input(&mut self) -> Result<Option<String>, SinkError>;
+    fn read_input(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<String>, SinkError>> + Send + '_>>;
 }
 
 /// Trait to abstract message behavior
-trait ChatSession {
+pub trait ChatSession {
     /// Send request and display the streaming answer within response sink
-    async fn request<S: ResponseSink>(
-        &mut self,
-        prompt: &str,
+    fn request<'a, S: ResponseSink + 'a>(
+        &'a mut self,
+        prompt: &'a str,
         chat_log: Vec<Message>,
-        sink: &mut S,
-    ) -> anyhow::Result<String>;
-
-    /// Show usage or not
-    fn show_usage(&self) -> bool {
-        false
-    }
-
-    /// Get the usage
-    fn usage(&self) -> Option<Usage> {
-        None
-    }
+        sink: &'a mut S,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + 'a>>;
 }
 
 /// Could only chat with assistant.
@@ -111,16 +114,30 @@ impl<T> ChatSession for ChatImpl<T>
 where
     T: Chat,
 {
-    async fn request<S: ResponseSink>(
-        &mut self,
-        prompt: &str,
+    fn request<'a, S: ResponseSink + 'a>(
+        &'a mut self,
+        prompt: &'a str,
         chat_log: Vec<Message>,
-        sink: &mut S,
-    ) -> anyhow::Result<String> {
-        let res = self.0.chat(prompt, chat_log).await?;
-        sink.output_text(&res);
+        sink: &'a mut S,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + 'a>> {
+        Box::pin(async move {
+            let res = self.0.chat(prompt, chat_log).await?;
+            sink.output_text(&res).await?;
+            Ok(res)
+        })
+    }
+}
 
-        Ok(res)
+pub fn extract_increment_and_update<'a>(previous: &mut String, new: &'a str) -> &'a str {
+    if new == previous {
+        ""
+    } else if let Some(delta) = new.strip_prefix(previous.as_str()) {
+        previous.clear();
+        previous.push_str(new);
+        delta
+    } else {
+        previous.push_str(new);
+        new
     }
 }
 
@@ -129,93 +146,79 @@ impl<M> ChatSession for AgentImpl<M>
 where
     M: CompletionModel + 'static,
 {
-    async fn request<S: ResponseSink>(
-        &mut self,
-        prompt: &str,
+    fn request<'a, S: ResponseSink + 'a>(
+        &'a mut self,
+        prompt: &'a str,
         chat_log: Vec<Message>,
-        sink: &mut S,
-    ) -> anyhow::Result<String> {
-        let mut response_stream = self
-            .agent
-            .stream_prompt(prompt)
-            .with_history(chat_log)
-            .multi_turn(self.multi_turn_depth)
-            .await;
+        sink: &'a mut S,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + 'a>> {
+        Box::pin(async move {
+            let mut response_stream = self
+                .agent
+                .stream_prompt(prompt)
+                .with_history(chat_log)
+                .multi_turn(self.multi_turn_depth)
+                .await;
 
-        let mut acc = String::new();
+            let mut acc = String::new();
+            let mut text_store = String::new();
+            let mut reasoning_store = String::new();
+            let mut is_reasoning = false;
 
-        let mut is_reasoning = false;
-        loop {
-            let Some(chunk) = response_stream.next().await else {
-                break Ok(acc);
-            };
+            loop {
+                let Some(chunk) = response_stream.next().await else {
+                    break Ok(acc);
+                };
 
-            // Process every kind of chunk
-            match chunk {
-                // Normal text
-                Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(Text {
-                    text,
-                }))) => {
-                    if text.contains("<think>") {
-                        sink.output_reason_start().await?;
-                        is_reasoning = true;
+                match chunk {
+                    Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(Text {
+                        text,
+                    }))) => {
+                        let true_text = extract_increment_and_update(&mut text_store, &text);
+                        acc.push_str(true_text);
 
-                        continue;
+                        if is_reasoning {
+                            sink.output_reason_end().await?;
+                            is_reasoning = false;
+                        }
+                        sink.output_text(&true_text).await?;
                     }
-                    if text.contains("</think>") {
-                        sink.output_reason_end().await?;
-                        is_reasoning = false;
+                    Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Reasoning(
+                        Reasoning { reasoning, .. },
+                    ))) => {
+                        let true_reasoning = extract_increment_and_update(
+                            &mut reasoning_store,
+                            reasoning.last().map(|s| s.as_str()).unwrap_or(""),
+                        );
 
-                        continue;
+                        if !is_reasoning {
+                            sink.output_reason_start().await?;
+                            is_reasoning = true;
+                        }
+                        sink.output_text(&true_reasoning).await?;
                     }
-
-                    if !is_reasoning {
-                        acc.push_str(&text);
+                    Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::ToolCall(
+                        ToolCall { function, .. },
+                    ))) => {
+                        let call_msg = format!(
+                            "Call function {} with arguments {}...",
+                            function.name, function.arguments
+                        );
+                        acc.push_str(&call_msg);
+                        sink.output_text(&call_msg).await?;
                     }
-                    sink.output_text(&text).await?;
-                }
-                // Reasoning
-                Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Reasoning(
-                    Reasoning { reasoning, .. },
-                ))) => {
-                    let reasoning = reasoning.join("\n");
-
-                    sink.output_reason_start().await?;
-                    sink.output_text(&reasoning).await?;
-                    sink.output_reason_end().await?;
-                }
-                // ToolCall
-                Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::ToolCall(
-                    ToolCall { function, .. },
-                ))) => {
-                    let call_msg = format!(
-                        "Call function {} with arguments {}...",
-                        function.name, function.arguments
-                    );
-
-                    acc.push_str(&call_msg);
-                    sink.output_text(&call_msg).await?;
-                }
-                // Final
-                Ok(MultiTurnStreamItem::FinalResponse(r)) => {
-                    if self.show_usage {
-                        self.usage = r.usage();
+                    Ok(MultiTurnStreamItem::FinalResponse(r)) => {
+                        if self.show_usage {
+                            self.usage = r.usage();
+                        }
                     }
+                    Err(e) => {
+                        sink.output_error(&e).await?;
+                    }
+                    _ => {}
                 }
-                Err(e) => {
-                    sink.output_error(&e);
-                }
-                _ => {}
             }
-        }
-    }
-
-    fn show_usage(&self) -> bool {
-        self.show_usage
-    }
-
-    fn usage(&self) -> Option<Usage> {
-        Some(self.usage)
+        })
     }
 }
 
@@ -297,20 +300,26 @@ where
     where
         S: ResponseSink + InputSource,
     {
+        sink.chat_start().await?;
+        info!("Session loop started");
+
         let mut chat_log = vec![];
         loop {
             sink.user_start().await?;
 
             if let Some(input) = sink.read_input().await? {
+                debug!("Processing user prompt (len={})", input.len());
                 let response = self.0.request(&input, chat_log.clone(), sink).await?;
                 chat_log.push(Message::user(input));
                 chat_log.push(Message::assistant(response));
             } else {
+                info!("Input source exhausted; exiting session loop");
                 break;
             }
         }
 
         sink.chat_finished().await?;
+        info!("Session loop finished");
 
         Ok(())
     }

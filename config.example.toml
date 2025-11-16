@@ -1,0 +1,32 @@
+# Example configuration for the whisper agent.
+# Copy this file to `config.toml` and replace placeholder values with your own.
+
+[[models]]
+# Primary completion / chat-capable model
+base_url = "https://api.openai.com/v1"
+api_key = "ENCRYPTED_COMPLETION_API_KEY"
+provider = "openai"
+model_name = "gpt-4o-mini"
+model_type = "completion"
+context_size = 4096
+
+[[models]]
+# Optional embedding model used for retrieval or tool selection
+base_url = "https://api.openai.com/v1"
+api_key = "ENCRYPTED_EMBEDDING_API_KEY"
+provider = "openai"
+model_name = "text-embedding-3-large"
+model_type = "embedding"
+context_size = 512
+
+[[mcp_servers]]
+name = "DocsIndex"
+protocol = "sse"
+url = "http://localhost:8080/sse"
+
+[[mcp_servers]]
+name = "Scripts"
+protocol = "stdio"
+command = "python3"
+args = ["scripts/tool_server.py"]
+envs = { API_KEY = "${YOUR_API_KEY}" }

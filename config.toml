@@ -1,31 +1,8 @@
 # config.toml
 [[models]]
 base_url = "https://api.deepseek.com/v1"
-api_key = "iKJJLQk6z0bhHgDcw/7enkVRedPwlmdWgeZl+0u2+FuybRYvNyS2lzcDI+1uZOI+hj+2oFoQJ1LCEpAPFlMT"
+api_key = "clhnYXuKNBigxzqvzgvRpDgu5FWh+vQ9kb9ksZYfHgTOS6IFOdoejnYVFKNSwIy4PI8ytMbIZSSQ7C1bkpPX"
 provider = "DeepSeek"
-model_name = "text-embedding-ada-002"
-model_type = "chat"
-
-[[models]]
-base_url = "http://localhost:11434"
-provider = "ollama"
-api_key = "IMvqT8etkXCtqVZNuzleUNbqdEKo5rsEdKnYHjyd2AcrGb+unX0D6gzdYRq7xuybYPY7iQf0OUuhFLa5kzFYpvrHh1jYbXll7vkLEwh2M2wW5sjjP33W7dl+eZ9Qn16I"
-model_name = "gpt-4"
-model_type = "embedding"
-
-
-[[mcp_servers]]
-name = "SseExample"
-protocol = "sse"
-url = "http://sse.example.com/sse"
-
-[[mcp_servers]]
-name = "StreamableExample"
-protocol = "streamable"
-url = "http://streamable.example.com/mcp"
-
-[[mcp_servers]]
-protocol = "stdio"
-command = "python3"
-args = ["script.py", "--verbose"]
-envs = { DEBUG = "true", API_KEY = "xyz" }
+model_name = "deepseek-reasoner"
+model_type = "completion"
+context_size = 64000

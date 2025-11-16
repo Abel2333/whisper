@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use flexi_logger::{Duplicate, FileSpec, Logger};
 use whisper::secure::{self, load_key_from_env};
 
 #[derive(Parser)]
@@ -28,6 +29,13 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+    let _logger = Logger::try_with_env_or_str("info")?
+        .log_to_file(FileSpec::default().directory("logs").basename("encryptor"))
+        .append()
+        .duplicate_to_stderr(Duplicate::Info)
+        .format(flexi_logger::opt_format)
+        .start()?;
+
     dotenvy::dotenv().ok();
 
     let cli = Cli::parse();
@@ -43,10 +51,12 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         // Read key
         Commands::Encrypt { text } => {
+            log::info!("Encrypting {} bytes", text.len());
             let crypt_text = secure::aes::encrypt(&text, &key_bytes)?;
             println!("Encrypted text: {crypt_text}");
         }
         Commands::Decrypt { text } => {
+            log::info!("Decrypting payload");
             let decrypt_text = secure::aes::decrypt(&text, &key_bytes)?;
             println!("Decrypted text: {decrypt_text}");
         }

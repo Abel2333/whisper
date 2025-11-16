@@ -1,15 +1,15 @@
-use crate::mcp::transport::TransportConfig;
 use crate::secure::{self, load_key_from_env};
 use config::{Config, Environment, File};
 use dotenvy::dotenv;
 use serde::{Deserialize, Deserializer, Serialize};
 
+/// Application configuration comprised of model definitions (and future transports).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
     pub models: Vec<ModelConfig>,
-    pub mcp_servers: Option<Vec<TransportConfig>>,
 }
 
+/// A single model entry loaded from `config.toml`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ModelConfig {
     pub base_url: String,
@@ -18,6 +18,7 @@ pub struct ModelConfig {
     pub provider: String,
     pub model_name: String,
     pub model_type: ModelType,
+    pub context_size: u32,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -44,6 +45,7 @@ pub fn load_config() -> Result<AppConfig, config::ConfigError> {
         .add_source(Environment::with_prefix("WHISPER").separator("__"));
 
     let config = builder.build()?;
+    log::info!("Configuration sources loaded; decrypting API keys");
 
     let key_bytes = load_key_from_env("ENCRYPT_KEY").expect("Get key bytes error!");
     let mut config = config.try_deserialize::<AppConfig>()?;
@@ -58,15 +60,40 @@ pub fn load_config() -> Result<AppConfig, config::ConfigError> {
             }
             // if decrypt error, skip this model
             Err(e) => {
-                eprintln!(
-                    "Failed to decrypt api_key for model '{}': {}. Skip it.",
-                    model.model_name, e
-                )
+                log::error!(
+                    "Failed to decrypt api_key for model '{}': {}. Skipping entry.",
+                    model.model_name,
+                    e
+                );
             }
         }
     }
 
+    log::info!(
+        "Loaded {} decrypted model configurations",
+        valid_models.len()
+    );
     config.models = valid_models;
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_is_lowercased() {
+        let toml = r#"
+base_url = "http://example"
+api_key = "SECRET"
+provider = "OPENAI"
+model_name = "chat"
+model_type = "completion"
+context_size = 2048
+"#;
+
+        let cfg: ModelConfig = toml::from_str(toml).expect("model config parse");
+        assert_eq!(cfg.provider, "openai");
+    }
 }

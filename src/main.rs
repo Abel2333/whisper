@@ -2,80 +2,24 @@
 // pub mod config;
 // pub mod mcp;
 use whisper::config;
-use whisper::mcp;
 
-use std::env;
-
-use rig::{
-    agent::AgentBuilder,
-    client::{CompletionClient, EmbeddingsClient},
-    embeddings::EmbeddingsBuilder,
-    providers::openai,
-    vector_store::in_memory_store::InMemoryVectorStore,
-};
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
-
-use crate::{chat::SessionBuilder, mcp::manager::McpManagerBuilder};
+use rig::{agent::AgentBuilder, client::CompletionClient, completion::Prompt, providers::openai};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // Load environment file
-    dotenvy::dotenv().ok();
 
     println!("Read config...");
     let app_config = config::read_config::load_config()?;
     println!("Get {app_config:#?}");
 
-
-    let file_appender = RollingFileAppender::new(
-        Rotation::DAILY,
-        "logs",
-        format!("{}.log", env!("CARGO_CRATE_NAME")),
-    );
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .with_writer(file_appender)
-        .with_file(false)
-        .with_ansi(false)
-        .init();
-
-    let mcp_manager = McpManagerBuilder::new()
-        .add_sse("Weather", "http://localhost:8000/sse")
-        .build()
-        .await?;
-
-    let tool_set = mcp_manager.get_tool_set().await?;
-
-    let client = match openai::Client::builder(env::var("PROVIDER_API_KEY")?.as_str())
-        .base_url(env::var("PROVIDER_BASE_URL")?.as_str())
-        .build()
-    {
-        Ok(c) => {
-            tracing::info!("Client initialized successfully");
-            c
-        }
-        Err(e) => {
-            tracing::error!("Failed to build Client: {}", e);
-            return Err(anyhow::anyhow!("Client build error: {}", e));
-        }
-    };
+    let client = openai::Client::builder(&app_config.models[0].api_key)
+        .base_url(&app_config.models[0].base_url)
+        .build()?;
 
     let chat_model = client
-        .completion_model(env::var("MODEL_NAME")?.as_str())
+        .completion_model(&app_config.models[0].model_name)
         .completions_api();
-
-    let embed_model = client.embedding_model("text-embedding-v3");
-    let embeddings = EmbeddingsBuilder::new(embed_model.clone())
-        .documents(tool_set.schemas()?)?
-        .build()
-        .await?;
-
-    let store = InMemoryVectorStore::from_documents_with_id_f(embeddings, |tool| tool.name.clone());
-
-    let index = store.index(embed_model);
 
     let agent = AgentBuilder::new(chat_model)
         .preamble(
@@ -85,14 +29,10 @@ then give the final concise answer.  Keep the explanation short but clear.
 ",
         )
         .temperature(0.6)
-        .dynamic_tools(2, index, tool_set)
         .build();
 
-    let conversation = SessionBuilder::new()
-        .agent(agent)
-        .multi_turn_depth(4)
-        .show_usage()
-        .build();
+    let response = agent.prompt("Hello").await.expect("Failed with agent");
+    println!("Agent: {response}");
 
-    conversation.run().await
+    Ok(())
 }
