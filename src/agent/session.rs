@@ -219,10 +219,12 @@ where
     }
 }
 
-/// type-state builder
-/// Builder<NoImplProvided> -> Builder<AgentImpl> -> . -> Session<AgentImpl>
+/// Type-state builder pipeline:
+/// `Builder<NoImplProvided>` -> `Builder<AgentImpl>` -> ... -> `Session<AgentImpl>`
+///
 /// or
-/// Builder<NoImplProvided> -> Builder<ChatImpl> -> Session<ChatImpl>
+///
+/// `Builder<NoImplProvided>` -> `Builder<ChatImpl>` -> `Session<ChatImpl>`
 impl Default for SessionBuilder<NoImplProvided> {
     fn default() -> Self {
         Self(NoImplProvided)
