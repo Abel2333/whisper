@@ -1,2 +1,0 @@
-createSrcSidebar('[["cli_chatbot",["",[],["cli_chatbot.rs"]]],["encryptor",["",[],["encryptor.rs"]]],["whisper",["",[["agent",[],["cli_chat.rs","dyn_embedding_wrapper.rs","mod.rs","model_adaptor.rs","session.rs"]],["config",[],["mod.rs","read_config.rs"]],["secure",[],["aes.rs","mod.rs"]]],["lib.rs"]]]]');
-//{"start":19,"fragment_lengths":[42,39,203]}

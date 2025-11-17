@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ModelType"],"fn":["load_config"],"struct":["AppConfig","ModelConfig"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SinkError"],"fn":["extract_increment_and_update"],"struct":["AgentImpl","ChatImpl","NoImplProvided","Session","SessionBuilder"],"trait":["ChatSession","InputSource","ResponseSink"]};
