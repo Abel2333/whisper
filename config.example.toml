@@ -18,15 +18,3 @@ provider = "openai"
 model_name = "text-embedding-3-large"
 model_type = "embedding"
 context_size = 512
-
-[[mcp_servers]]
-name = "DocsIndex"
-protocol = "sse"
-url = "http://localhost:8080/sse"
-
-[[mcp_servers]]
-name = "Scripts"
-protocol = "stdio"
-command = "python3"
-args = ["scripts/tool_server.py"]
-envs = { API_KEY = "${YOUR_API_KEY}" }
