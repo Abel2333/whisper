@@ -82,7 +82,7 @@ impl ResponseSink for CliFrontend {
     ) -> Pin<Box<dyn Future<Output = Result<(), session::SinkError>> + Send + '_>> {
         Box::pin(async move {
             self.output
-                .write_all(b"\n\x1b[1;32m\xF0\x9F\x98\x80 User: \x1b[0m\n> ")
+                .write_all(b"\n\x1b[1;34m\xF0\x9F\xA4\x96 AI: \x1b[0m\n")
                 .await?;
             self.output.flush().await?;
             Ok(())

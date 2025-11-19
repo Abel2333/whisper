@@ -21,20 +21,24 @@ pub enum SinkError {
     #[error("Output Error: {0}")]
     Output(String),
 
-    /// 其他未分类错误
-    #[error("Unkown Error: {0}")]
+    /// Other uncategorized errors
+    #[error("Unknown Error: {0}")]
     Other(String),
 }
 
-/// Nothing
+// The following structs are used to implement the type-state builder pattern.
+// This pattern ensures that a `Session` is always created with a valid
+// implementation of either `Chat` or `Agent`.
+
+/// A placeholder struct indicating that no implementation has been provided yet.
 pub struct NoImplProvided;
 
-/// Could chat
+/// A struct that holds a `Chat` implementation.
 pub struct ChatImpl<T>(T)
 where
     T: Chat;
 
-/// An agent
+/// A struct that holds an `Agent` implementation.
 pub struct AgentImpl<M>
 where
     M: CompletionModel + 'static,
@@ -45,62 +49,66 @@ where
     usage: Usage,
 }
 
-/// Type-state builder that ensures an agent/chat implementation is provided.
+/// A type-state builder for creating a `Session`.
+/// The type `T` represents the state of the builder.
 pub struct SessionBuilder<T>(T);
 
-/// Wrapper that executes the configured chat or agent.
+/// A wrapper that executes the configured chat or agent.
 pub struct Session<T>(T);
 
-/// Trait to abstract display
+/// A trait for abstracting the output of the chat session.
+/// This allows the session to be used with different frontends (e.g., CLI, GUI).
 pub trait ResponseSink {
-    /// Output the string to indicate the start of the chat
+    /// Called at the start of the chat session.
     fn chat_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
-    /// Output the string to indicate the start of user's query
+    /// Called at the start of a user's query.
     fn user_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
-    /// Output the string to indicate the start of assistant's answer
+    /// Called at the start of the assistant's answer.
     fn output_start(&mut self) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
-    /// Output the normal text
+    /// Outputs normal text from the assistant.
     fn output_text(
         &mut self,
         content: &(dyn std::fmt::Display + Send + Sync),
     ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
-    /// Output the start of reasoning content
+    /// Called at the start of a reasoning block.
     fn output_reason_start(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
-    /// Output the end of reasoning content
+    /// Called at the end of a reasoning block.
     fn output_reason_end(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
-    /// Output the end of assistant's answer
+    /// Called at the end of the assistant's answer.
     fn output_finished(
         &mut self,
         usage: &Option<Usage>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
-    /// Output the end of chat
+    /// Called at the end of the chat session.
     fn chat_finished(&mut self)
     -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 
-    /// Output the error
+    /// Outputs an error message.
     fn output_error(
         &mut self,
         e: &(dyn std::fmt::Display + Send + Sync),
     ) -> Pin<Box<dyn Future<Output = Result<(), SinkError>> + Send + '_>>;
 }
 
-/// Trait to abstract get input
+/// A trait for abstracting the input of the chat session.
 pub trait InputSource {
+    /// Reads a line of input from the user.
     fn read_input(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<Option<String>, SinkError>> + Send + '_>>;
 }
 
-/// Trait to abstract message behavior
+/// A trait that abstracts the behavior of a chat session.
+/// This allows for different implementations of the session (e.g., with an agent or a simple chat model).
 pub trait ChatSession {
-    /// Send request and display the streaming answer within response sink
+    /// Sends a request to the model and streams the response to the `ResponseSink`.
     fn request<'a, S: ResponseSink + 'a>(
         &'a mut self,
         prompt: &'a str,
@@ -109,7 +117,7 @@ pub trait ChatSession {
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + 'a>>;
 }
 
-/// Could only chat with assistant.
+/// Implementation of `ChatSession` for a simple `Chat` model.
 impl<T> ChatSession for ChatImpl<T>
 where
     T: Chat,
@@ -128,6 +136,7 @@ where
     }
 }
 
+/// A helper function to extract the incremental update from a string.
 pub fn extract_increment_and_update<'a>(previous: &mut String, new: &'a str) -> &'a str {
     if new == previous {
         ""
@@ -141,7 +150,8 @@ pub fn extract_increment_and_update<'a>(previous: &mut String, new: &'a str) -> 
     }
 }
 
-/// Could chat, reasoning, call tools
+/// Implementation of `ChatSession` for an `Agent`.
+/// This implementation can handle reasoning and tool calls.
 impl<M> ChatSession for AgentImpl<M>
 where
     M: CompletionModel + 'static,
@@ -222,25 +232,24 @@ where
     }
 }
 
-/// Type-state builder pipeline:
-/// `Builder<NoImplProvided>` -> `Builder<AgentImpl>` -> ... -> `Session<AgentImpl>`
-///
-/// or
-///
-/// `Builder<NoImplProvided>` -> `Builder<ChatImpl>` -> `Session<ChatImpl>`
+// The following `impl` blocks define the type-state builder pipeline.
+// The pipeline starts with `SessionBuilder<NoImplProvided>` and transitions
+// to either `SessionBuilder<AgentImpl>` or `SessionBuilder<ChatImpl>`.
+// Finally, the `build` method is called to create a `Session`.
+
 impl Default for SessionBuilder<NoImplProvided> {
     fn default() -> Self {
         Self(NoImplProvided)
     }
 }
 
-/// Builder from empty
+/// Methods for the initial state of the `SessionBuilder`.
 impl SessionBuilder<NoImplProvided> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Add an agent to Session
+    /// Adds an `Agent` to the session.
     pub fn agent<M: CompletionModel + 'static>(
         self,
         agent: Agent<M>,
@@ -253,26 +262,30 @@ impl SessionBuilder<NoImplProvided> {
         })
     }
 
-    /// Add a chat to Session
+    /// Adds a `Chat` model to the session.
     pub fn chat<T: Chat>(self, chatbot: T) -> SessionBuilder<ChatImpl<T>> {
         SessionBuilder(ChatImpl(chatbot))
     }
 }
 
+/// Methods for the `SessionBuilder` with a `Chat` model.
 impl<T> SessionBuilder<ChatImpl<T>>
 where
     T: Chat,
 {
+    /// Builds the `Session`.
     pub fn build(self) -> Session<ChatImpl<T>> {
         let SessionBuilder(chat_impl) = self;
         Session(chat_impl)
     }
 }
 
+/// Methods for the `SessionBuilder` with an `Agent`.
 impl<M> SessionBuilder<AgentImpl<M>>
 where
     M: CompletionModel + 'static,
 {
+    /// Sets the multi-turn depth for the agent.
     pub fn multi_turn_depth(self, multi_turn_depth: usize) -> Self {
         SessionBuilder(AgentImpl {
             multi_turn_depth,
@@ -280,6 +293,7 @@ where
         })
     }
 
+    /// Sets whether to show token usage.
     pub fn show_usage(self) -> Self {
         SessionBuilder(AgentImpl {
             show_usage: true,
@@ -287,15 +301,18 @@ where
         })
     }
 
+    /// Builds the `Session`.
     pub fn build(self) -> Session<AgentImpl<M>> {
         Session(self.0)
     }
 }
 
+/// Methods for the `Session`.
 impl<T> Session<T>
 where
     T: ChatSession,
 {
+    /// Runs the chat session.
     pub async fn run<S>(mut self, sink: &mut S) -> anyhow::Result<()>
     where
         S: ResponseSink + InputSource,
@@ -309,7 +326,10 @@ where
 
             if let Some(input) = sink.read_input().await? {
                 debug!("Processing user prompt (len={})", input.len());
+
+                sink.output_start().await?;
                 let response = self.0.request(&input, chat_log.clone(), sink).await?;
+
                 chat_log.push(Message::user(input));
                 chat_log.push(Message::assistant(response));
             } else {

@@ -2,19 +2,47 @@
 # Copy this file to `config.toml` and replace placeholder values with your own.
 
 [[models]]
-# Primary completion / chat-capable model
+# The base URL of the API for the model.
+# For OpenAI, this is "https://api.openai.com/v1".
 base_url = "https://api.openai.com/v1"
+
+# The API key for the model.
+# It is recommended to use an encrypted key.
 api_key = "ENCRYPTED_COMPLETION_API_KEY"
+
+# The provider of the model.
+# This should be a lowercase string, e.g., "openai".
 provider = "openai"
+
+# The name of the model to use.
 model_name = "gpt-4o-mini"
+
+# The type of the model.
+# Can be "completion" or "embedding".
 model_type = "completion"
+
+# The context size of the model.
 context_size = 4096
 
 [[models]]
-# Optional embedding model used for retrieval or tool selection
+# The base URL of the API for the model.
+# For OpenAI, this is "https://api.openai.com/v1".
 base_url = "https://api.openai.com/v1"
+
+# The API key for the model.
+# It is recommended to use an encrypted key.
 api_key = "ENCRYPTED_EMBEDDING_API_KEY"
+
+# The provider of the model.
+# This should be a lowercase string, e.g., "openai".
 provider = "openai"
+
+# The name of the model to use.
 model_name = "text-embedding-3-large"
+
+# The type of the model.
+# Can be "completion" or "embedding".
 model_type = "embedding"
+
+# The context size of the model.
 context_size = 512
