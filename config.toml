@@ -1,8 +1,0 @@
-# config.toml
-[[models]]
-base_url = "https://api.deepseek.com/v1"
-api_key = "clhnYXuKNBigxzqvzgvRpDgu5FWh+vQ9kb9ksZYfHgTOS6IFOdoejnYVFKNSwIy4PI8ytMbIZSSQ7C1bkpPX"
-provider = "DeepSeek"
-model_name = "deepseek-reasoner"
-model_type = "completion"
-context_size = 64000

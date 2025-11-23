@@ -40,13 +40,26 @@ crate.
 - `cargo clippy --all-targets --all-features -D warnings`
 - `cargo test --all -- --nocapture`
 
-These match the repository guidelines in `AGENTS.md` and should be run before
-committing changes.
+These match the repository guidelines in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) and should be run before committing changes.
 
 ## Documentation
 
-- Pre-generated API docs live in `docs/` (open `docs/whisper/index.html`). This
-  folder can be published directly with GitHub Pages if desired.
+### Project Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Overall system architecture and design patterns
+- **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)** - Development guidelines and coding standards
+- **[docs/CLAUDE.md](docs/CLAUDE.md)** - Guide for Claude Code AI assistant
+
+### Module Documentation
+
+- **[src/agent/README.md](src/agent/README.md)** - Agent system architecture and session management
+- **[src/agent/tools/README.md](src/agent/tools/README.md)** - Built-in tools and how to add new ones
+- **[src/config/README.md](src/config/README.md)** - Configuration loading and encrypted credentials
+- **[src/secure/README.md](src/secure/README.md)** - AES-256-GCM encryption implementation
+
+### API Documentation
+
+- Pre-generated API docs live in `docs/` (open `docs/whisper/index.html`). This folder can be published directly with GitHub Pages if desired.
 - Regenerate docs after code changes:
 
   ```bash
