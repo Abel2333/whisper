@@ -1,8 +1,15 @@
 /target
 /logs
 
-# Ignore cargo doc output but keep curated manuals.
-/docs/*
-!/docs/manual/
-
+# Environment and personal config files
 .env
+config.toml
+
+# Backup files
+*.bak
+*.tmp
+*~
+
+# Rustdoc output (keep hand-written docs like ARCHITECTURE.md, etc.)
+/docs/whisper/
+/docs/.lock
