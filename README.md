@@ -14,21 +14,29 @@ crate.
 
 ## Getting Started
 
+### First-Time Setup
+
 1. Install the latest stable Rust toolchain (`rustup default stable`).
-2. Copy the sample config and replace placeholders with your credentials:
+
+2. Configure Git (commit template and aliases):
+   ```bash
+   ./scripts/setup-git.sh
+   ```
+
+3. Copy the sample config and replace placeholders with your credentials:
 
    ```bash
    cp config.example.toml config.toml
    export ENCRYPT_KEY="hex-or-base64-key"
    ```
 
-3. Run the chat agent:
+4. Run the chat agent:
 
    ```bash
    cargo run --bin cli_chatbot -- --config config.toml
    ```
 
-4. Exercise the encryptor:
+5. Exercise the encryptor:
 
    ```bash
    cargo run --bin encryptor -- encrypt --text "secret"
@@ -36,12 +44,21 @@ crate.
 
 ## Development Workflow
 
+### Code Quality
+
 - `cargo fmt --all`
 - `cargo clippy --all-targets --all-features -D warnings`
 - `cargo test --all -- --nocapture`
 
-These match the repository guidelines and should be run before
-committing changes.
+Run these before committing changes.
+
+### Git Workflow
+
+This project uses **Git Flow** with **Conventional Commits**. See [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) for:
+- Branch naming conventions (feature/, release/, hotfix/)
+- Commit message format (type(scope): subject)
+- Release process
+- Examples and best practices
 
 ### Commit & Pull Request Guidelines
 
