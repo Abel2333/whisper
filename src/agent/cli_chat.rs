@@ -1,20 +1,27 @@
-use std::{future::Future, pin::Pin};
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
+use std::{
+    future::Future,
+    io::{stdout, Write},
+    pin::Pin,
+};
+use unicode_width::UnicodeWidthChar;
 
 use crate::agent::session::{self, InputSource, ResponseSink};
 use log::{debug, info};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter, stdin, stdout};
+use tokio::io::{AsyncWriteExt, BufWriter};
 
 /// Simple stdin/stdout frontend that feeds the agent session loop.
 pub struct CliFrontend {
-    input: BufReader<tokio::io::Stdin>,
     output: BufWriter<tokio::io::Stdout>,
 }
 
 impl CliFrontend {
     pub fn new() -> Self {
         Self {
-            input: BufReader::new(stdin()),
-            output: BufWriter::new(stdout()),
+            output: BufWriter::new(tokio::io::stdout()),
         }
     }
 }
@@ -30,18 +37,57 @@ impl InputSource for CliFrontend {
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<Option<String>, session::SinkError>> + Send + '_>> {
         Box::pin(async move {
-            let mut buf = String::new();
-            self.input.read_line(&mut buf).await?;
+            enable_raw_mode()?;
+            let mut line = String::new();
+            loop {
+                let event = event::read()?;
+                if let Event::Key(key_event) = event {
+                    match key_event.code {
+                        KeyCode::Enter => {
+                            disable_raw_mode()?;
+                            self.output.write_all(b"\n").await?;
+                            self.output.flush().await?;
+                            break;
+                        }
+                        KeyCode::Char(c) => {
+                            line.push(c);
+                            print!("{c}");
+                            stdout().flush()?;
+                        }
+                        KeyCode::Backspace => {
+                            if let Some(c) = line.pop() {
+                                // Get the display width of the removed character
+                                let width = c.width().unwrap_or(1);
 
-            let line = buf.trim().to_string();
+                                // Move cursor back by width
+                                for _ in 0..width {
+                                    print!("\x08");
+                                }
+                                // Clear by printing spaces
+                                for _ in 0..width {
+                                    print!(" ");
+                                }
+                                // Move cursor back again
+                                for _ in 0..width {
+                                    print!("\x08");
+                                }
+                                stdout().flush()?;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
-            if line == ":q" {
+            let trimmed_line = line.trim().to_string();
+
+            if trimmed_line == ":q" {
                 info!("User requested to exit chat");
                 return Ok(None);
             }
 
-            debug!("Captured user input with {} characters", line.len());
-            Ok(Some(line))
+            debug!("Captured user input with {} characters", trimmed_line.len());
+            Ok(Some(trimmed_line))
         })
     }
 }

@@ -13,7 +13,7 @@ use rig::{
 use serde::Serialize;
 
 use crate::{
-    agent::dyn_embedding_wrapper::DynEmbeddingModelWrapper,
+    agent::{dyn_embedding_wrapper::DynEmbeddingModelWrapper, tools::calculator::CalculatorTool},
     config::read_config::{ModelConfig, ModelType},
 };
 
@@ -22,6 +22,7 @@ pub struct AgentSettings {
     temperature: f32,
     tool_set: Option<ToolSet>,
     preamble: String,
+    builtin_tools: BuiltinToolsConfig,
 }
 
 type DynCompletionModel = Arc<dyn CompletionModelDyn>;
@@ -29,6 +30,17 @@ type DynEmbeddingModel = Arc<dyn EmbeddingModelDyn>;
 
 type CompletionHandle = CompletionModelHandle<'static>;
 type GeneralEmb = DynEmbeddingModelWrapper<2048>;
+
+#[derive(Clone, Debug)]
+pub struct BuiltinToolsConfig {
+    pub calculator: bool,
+}
+
+impl Default for BuiltinToolsConfig {
+    fn default() -> Self {
+        Self { calculator: true }
+    }
+}
 
 impl AgentSettings {
     pub fn try_new(
@@ -42,10 +54,16 @@ impl AgentSettings {
             tool_set,
             temperature,
             preamble,
+            builtin_tools: BuiltinToolsConfig::default(),
         };
         settings.validate()?;
 
         Ok(settings)
+    }
+
+    pub fn with_builtin_tools(mut self, builtin_tools: BuiltinToolsConfig) -> Self {
+        self.builtin_tools = builtin_tools;
+        self
     }
 
     fn validate(&self) -> anyhow::Result<()> {
@@ -100,6 +118,7 @@ where
     let AgentSettings {
         model_configs,
         tool_set,
+        builtin_tools,
         preamble,
         temperature,
     } = agent_settings;
@@ -127,6 +146,10 @@ where
     })
     .preamble(&preamble)
     .temperature(temperature as f64);
+
+    if builtin_tools.calculator {
+        builder = builder.tool(CalculatorTool::default());
+    }
 
     if let Some(model) = embedding_model.as_ref() {
         match docs.take() {
@@ -289,6 +312,7 @@ mod tests {
             temperature: 0.5,
             tool_set: None,
             preamble: "system".into(),
+            builtin_tools: BuiltinToolsConfig::default(),
         };
         assert!(settings.validate().is_ok());
     }
@@ -300,6 +324,7 @@ mod tests {
             temperature: 0.5,
             tool_set: None,
             preamble: "system".into(),
+            builtin_tools: BuiltinToolsConfig::default(),
         };
         assert!(settings.validate().is_err());
     }
@@ -314,6 +339,7 @@ mod tests {
             temperature: 0.5,
             tool_set: None,
             preamble: "system".into(),
+            builtin_tools: BuiltinToolsConfig::default(),
         };
         assert!(settings.validate().is_ok());
     }
@@ -329,6 +355,7 @@ mod tests {
             temperature: 0.5,
             tool_set: None,
             preamble: "system".into(),
+            builtin_tools: BuiltinToolsConfig::default(),
         };
         assert!(settings.validate().is_err());
     }
