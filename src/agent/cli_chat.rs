@@ -7,6 +7,7 @@ use std::{
     io::{stdout, Write},
     pin::Pin,
 };
+use unicode_width::UnicodeWidthChar;
 
 use crate::agent::session::{self, InputSource, ResponseSink};
 use log::{debug, info};
@@ -54,9 +55,22 @@ impl InputSource for CliFrontend {
                             stdout().flush()?;
                         }
                         KeyCode::Backspace => {
-                            if !line.is_empty() {
-                                line.pop();
-                                print!("\x08 \x08");
+                            if let Some(c) = line.pop() {
+                                // Get the display width of the removed character
+                                let width = c.width().unwrap_or(1);
+
+                                // Move cursor back by width
+                                for _ in 0..width {
+                                    print!("\x08");
+                                }
+                                // Clear by printing spaces
+                                for _ in 0..width {
+                                    print!(" ");
+                                }
+                                // Move cursor back again
+                                for _ in 0..width {
+                                    print!("\x08");
+                                }
                                 stdout().flush()?;
                             }
                         }
